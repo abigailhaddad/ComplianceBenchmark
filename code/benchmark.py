@@ -229,7 +229,7 @@ class ModelTrainer:
 
     @staticmethod
     def generate_predictions_dataframe(trainer, dataset, dataset_name):
-        texts = [item['text'] for item in dataset]
+        texts = [item['response'] for item in dataset]
         indices = dataset['index']
         predictions_output = trainer.predict(dataset)
         logits = predictions_output.predictions
@@ -240,7 +240,7 @@ class ModelTrainer:
             'response': texts,
             'test_or_train': [dataset_name] * len(texts),
             'real_label': [item['label'] for item in dataset],
-            'model_label': predictions
+            'predicted_label': predictions
         })
 
 class LLMUtility:
@@ -591,6 +591,7 @@ def gen_model(specific_refuse_text="I'm sorry, but I can't assist with that.", l
     similarity_analysis = SimilarityAnalysis(df_responses, similarity_model_name)
     df_with_distances = similarity_analysis.calculate_distances_to_refuse(specific_refuse_text)
     df_with_classifications = similarity_analysis.classify_responses(cut_score=.3)
+    
 
     df_for_bert = DataPreparer.prepare_data_for_bert(df_with_distances)
 
@@ -610,8 +611,10 @@ def gen_model(specific_refuse_text="I'm sorry, but I can't assist with that.", l
 
     trainer, tokenizer, bert_predictions_df = train_and_evaluate_bert(df_for_bert, model_checkpoint, training_args)
 
-
+    df_with_classifications = df_with_classifications.drop(columns = 'response')
     final_df = pd.merge(df_with_classifications, bert_predictions_df, on='index')
+    print(final_df.columns)
+    print(final_df)
 
     refuse_text_path = '../model/specific_refuse_text.txt'
     with open(refuse_text_path, 'w') as file:
@@ -665,7 +668,7 @@ def apply_model(llm_name, llm_provider):
     predictions = np.argmax(predictions_output.predictions, axis=-1)
 
     # Add predictions to DataFrame
-    df_new_responses['model_label'] = predictions
+    df_new_responses['predicted_label'] = predictions
 
     # Perform similarity analysis if needed
     similarity_analysis = SimilarityAnalysis(df_new_responses, similarity_model_name)
