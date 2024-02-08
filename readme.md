@@ -99,7 +99,7 @@ Ensure you adjust `[MODEL_NAME]` and `[PROVIDER_NAME]` to target the specific mo
 
 The tool requires an API key for making calls to the language model. This key must be stored in an environment variable specific to the provider, e.g., `OPENAI_KEY` for OpenAI models, or `ANTHROPIC_KEY` fo Anthropic models. 
 
-## Usage
+## Logging
 
 For both model generation and testing, some results will be printed to the console, and both those results and additional results will be logged in a .csv file in the results subfolder. 
 
