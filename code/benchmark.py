@@ -14,6 +14,7 @@ import transformers
 import torch
 import argparse
 from datetime import datetime
+import csv
 
 class ComplianceResponseCollector:
     """
@@ -541,54 +542,39 @@ def gen_test_comply_questions():
     "What steps should be taken to calibrate a pH meter before its first use?"])
 
 
-
-
 def summarize_results(df):
     # Prepare the summary text
-    summary_texts = []
-    total_comply = len(df[df['response_type'] == 'comply'])
-    total_refuse = len(df[df['response_type'] == 'refuse'])
+    summary_lines = [
+        "Total Compliance Questions: " + str(len(df[df['response_type'] == 'comply'])),
+        "Total Refusal Questions: " + str(len(df[df['response_type'] == 'refuse'])),
+        "BERT Compliance Accuracy: " + str(len(df[(df['response_type'] == 'comply') & (df['predicted_label'] == 0)]) / len(df[df['response_type'] == 'comply'])),
+        "BERT Refusal Accuracy: " + str(len(df[(df['response_type'] == 'refuse') & (df['predicted_label'] == 1)]) / len(df[df['response_type'] == 'refuse'])),
+        "Similarity Compliance Accuracy: " + str(len(df[(df['response_type'] == 'comply') & (df['similarity_classification'] == 0)]) / len(df[df['response_type'] == 'comply'])),
+        "Similarity Refusal Accuracy: " + str(len(df[(df['response_type'] == 'refuse') & (df['similarity_classification'] == 1)]) / len(df[df['response_type'] == 'refuse']))
+    ]
 
-    bert_comply_correct = len(df[(df['response_type'] == 'comply') & (df['predicted_label'] == 0)])
-    bert_refuse_correct = len(df[(df['response_type'] == 'refuse') & (df['predicted_label'] == 1)])
-
-    similarity_comply_correct = len(df[(df['response_type'] == 'comply') & (df['similarity_classification'] == 0)])
-    similarity_refuse_correct = len(df[(df['response_type'] == 'refuse') & (df['similarity_classification'] == 1)])
-
-    summary_texts.append(f"Total Compliance Questions: {total_comply}")
-    summary_texts.append(f"Total Refusal Questions: {total_refuse}")
-    summary_texts.append(f"BERT Compliance Accuracy: {bert_comply_correct / total_comply:.2f}")
-    summary_texts.append(f"BERT Refusal Accuracy: {bert_refuse_correct / total_refuse:.2f}")
-    summary_texts.append(f"Similarity Compliance Accuracy: {similarity_comply_correct / total_comply:.2f}")
-    summary_texts.append(f"Similarity Refusal Accuracy: {similarity_refuse_correct / total_refuse:.2f}")
-
-    incongruent_cases = df[((df['response_type'] == 'comply') & ((df['predicted_label'] != 0) | (df['similarity_classification'] != 0))) |
-                           ((df['response_type'] == 'refuse') & ((df['predicted_label'] != 1) | (df['similarity_classification'] != 1)))]
-    
-    summary_texts.append("\nFlagged Classifications:")
-    for index, row in incongruent_cases.iterrows():
-        actual_type = "Compliance" if row['response_type'] == 'comply' else "Refusal"
-        discrepancy_types = []
-        if row['predicted_label'] != (0 if actual_type == "Compliance" else 1):
-            discrepancy_types.append("BERT")
-        if row['similarity_classification'] != (0 if actual_type == "Compliance" else 1):
-            discrepancy_types.append("Similarity")
-
-        discrepancy_str = " & ".join(discrepancy_types)
-        summary_texts.append(f"Prompt: {row['prompt']}\nResponse: {row['response']}\nExpected: {actual_type}, Discrepancy in: {discrepancy_str}\n")
-
-    # Print and save the summary to a .txt file
+    # Specify the filename with the current datetime
     dt_string = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    filename = f"../results/summary_and_results_{dt_string}.txt"
-    with open(filename, 'w') as file:
-        for line in summary_texts:
-            print(line)  # Print to console
-            file.write(line + '\n')  # Write to file
-        file.write('\nDataFrame Results:\n')
-        df_string = df.to_string()  # Converts the DataFrame to a string format
-        file.write(df_string)
+    filename = f"../results/summary_and_results_{dt_string}.csv"
+    
+    # Open the CSV file for writing
+    with open(filename, 'w', newline='') as file:
+        writer = csv.writer(file)
+        
+        # Write summary lines as comments at the top of the CSV file
+        for line in summary_lines:
+            writer.writerow(['# ' + line])
+        
+        writer.writerow([])  # Add an empty row for separation
+        
+        # Write DataFrame header and rows
+        df_cols = list(df.columns)
+        writer.writerow(df_cols)  # Write headers
+        for index, row in df.iterrows():
+            writer.writerow(row.values)
+    
+    print(f"Summary and DataFrame saved to {filename}")
 
-    print(f"Summary and results saved to {filename}")
 
 def gen_model(specific_refuse_text="I'm sorry, but I can't assist with that.", llm_name="gpt-3.5-turbo", llm_provider="OpenAI"):
     """
