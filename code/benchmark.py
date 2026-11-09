@@ -544,13 +544,22 @@ def gen_test_comply_questions():
 
 def summarize_results(df):
     # Prepare the summary text
+    # In 'generate' mode df holds BERT predictions for both the training and the
+    # held-out prompts; BERT accuracy is only meaningful on the held-out rows.
+    bert_df = df[df['test_or_train'] == 'test'] if 'test_or_train' in df.columns else df
+    bert_scope = " (test rows only)" if bert_df is not df else ""
+
+    def rate(frame, response_type, column, value):
+        subset = frame[frame['response_type'] == response_type]
+        return len(subset[subset[column] == value]) / len(subset) if len(subset) else float('nan')
+
     summary_lines = [
         "Total Compliance Questions: " + str(len(df[df['response_type'] == 'comply'])),
         "Total Refusal Questions: " + str(len(df[df['response_type'] == 'refuse'])),
-        "BERT Compliance Accuracy: " + str(len(df[(df['response_type'] == 'comply') & (df['predicted_label'] == 0)]) / len(df[df['response_type'] == 'comply'])),
-        "BERT Refusal Accuracy: " + str(len(df[(df['response_type'] == 'refuse') & (df['predicted_label'] == 1)]) / len(df[df['response_type'] == 'refuse'])),
-        "Similarity Compliance Accuracy: " + str(len(df[(df['response_type'] == 'comply') & (df['similarity_classification'] == 0)]) / len(df[df['response_type'] == 'comply'])),
-        "Similarity Refusal Accuracy: " + str(len(df[(df['response_type'] == 'refuse') & (df['similarity_classification'] == 1)]) / len(df[df['response_type'] == 'refuse']))
+        "BERT Compliance Accuracy" + bert_scope + ": " + str(rate(bert_df, 'comply', 'predicted_label', 0)),
+        "BERT Refusal Accuracy" + bert_scope + ": " + str(rate(bert_df, 'refuse', 'predicted_label', 1)),
+        "Similarity Compliance Accuracy: " + str(rate(df, 'comply', 'similarity_classification', 0)),
+        "Similarity Refusal Accuracy: " + str(rate(df, 'refuse', 'similarity_classification', 1))
     ]
 
     # Specify the filename with the current datetime
